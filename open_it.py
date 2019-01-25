@@ -4,6 +4,7 @@ from bs4 import BeautifulSoup as bs
 import json
 import zipfile
 from shutil import copyfile, rmtree
+from shared_variables import API_KEY
 
 
 class TranslatePresentation:
@@ -90,7 +91,7 @@ class TranslatePresentation:
     @staticmethod
     def request_translation(text_input):
         url = "https://translate.yandex.net/api/v1.5/tr.json/translate"
-        params = dict(key="trnsl.1.1.20181021T090215Z.8bb8be7f52fe5b1e.10108f7b3312c6806795eb298f7960b1fd436295",
+        params = dict(key=API_KEY,
                       text=text_input.encode("UTF-8"),
                       lang="fi-en")
         method = "GET"

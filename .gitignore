@@ -5,3 +5,5 @@ Files/
 *.docx
 *.pptx
 *.txt
+shared_variables.py
+shared_variables.pickle
