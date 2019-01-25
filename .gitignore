@@ -1,0 +1,7 @@
+venv/
+Testing_files/
+.idea/
+Files/
+*.docx
+*.pptx
+*.txt
