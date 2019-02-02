@@ -7,3 +7,4 @@ Files/
 *.txt
 shared_variables.py
 shared_variables.pickle
+__pycache__/

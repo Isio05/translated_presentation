@@ -205,8 +205,16 @@ class TranslateDocument(TranslatePresentation):
 
         return translation
 
-# translate = TranslatePresentation()
-# translate.main()
 
-# translate = TranslateDocument()
-# translate.main()
+while True:
+    file_type = input("Type in file type (.docx/.pptx) or 'exit': ")
+    if file_type == ".docx":
+        translate = TranslateDocument()
+        translate.main()
+    elif file_type == ".pptx":
+        translate = TranslatePresentation()
+        translate.main()
+    elif file_type == 'exit':
+        break
+    else:
+        print("Wrong file extension")
