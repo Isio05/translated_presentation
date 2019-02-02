@@ -6,7 +6,7 @@ import zipfile
 from shutil import copyfile, rmtree
 import boto3
 import re
-import threading
+from threading import Thread
 from queue import Queue
 from shared_variables import AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, API_KEY
 
@@ -67,11 +67,39 @@ class TranslatePresentation:
             current_slide_data = archive.read("".join([slide_location, current_slide]))
             xml_soup = bs(current_slide_data.decode("UTF-8"), 'lxml')
 
+            # Not threaded version
             # Text on each slide is surrounded by "a:t"
             # Loop iterates through each mark in the xml file, sends it to API and saves translation to dictionary
-            for text in xml_soup.find_all("a:t"):
-                translated = self.request_translation(text_input=text.string)
-                translation[text.string] = translated
+            # for text in xml_soup.find_all("a:t"):
+            #     translated = self.request_translation(text_input=text.string)
+            #     translation[text.string] = translated
+
+            # Text on each slide is surrounded by "a:t"
+            # After finding it is converted to strings
+            q = Queue()
+            texts_to_translate = xml_soup.find_all("a:t")
+            texts_to_translate = [text.string for text in texts_to_translate]
+
+            # Each worker is in fact a subscript for the list of text to translate
+            # Each thread iterates through given text in the list, sends it to API and saves translation to dictionary
+            def threader():
+                while True:
+                    worker = q.get()
+                    translated = self.request_translation(text_input=texts_to_translate[worker])
+                    translation[texts_to_translate[worker]] = translated
+                    q.task_done()
+
+            # Ten threads are spawned
+            for i in range(10):
+                t = Thread(target=threader)
+                t.daemon = True
+                t.start()
+
+            # Each possibile index for the list of text to translate is put in the queue
+            for text_pos in range(len(texts_to_translate)):
+                q.put(text_pos)
+
+            q.join()
 
             # The source slide is unpacked into simple string
             # Using dictionary that contains translations and sources, text will be replaced in the string
@@ -183,19 +211,39 @@ class TranslateDocument(TranslatePresentation):
         current_slide_data = archive.read(contents_file_rel_path)
         xml_soup = bs(current_slide_data.decode("UTF-8"), 'lxml')
 
-        # Text on each slide is surrounded by "w:t"
-        # Loop iterates through each mark in the xml file, sends it to API and saves translation to dictionary
-        for text in xml_soup.find_all("w:t"):
-            translated = super().request_translation(text_input=text.string)
-            translation[text.string] = translated
-            # # To evade problems with replacing, space is trimmed from the string written to the dictionary
-            # if text.string[-1] == " ":
-            #     # To handle more than one space at the end of the string, re finds beginning of each 'space sequence'
-            #     # in the string and then the last one is chosen
-            #     found_spaces = [x.start() for x in re.finditer(" +", text.string)]
-            #     translation[text.string[:found_spaces[-1]]] = translated
-            # else:
-            #     translation[text.string] = translated
+        # Not threaded version:
+        # # Text is surrounded by "w:t"
+        # # Loop iterates through each mark in the xml file, sends it to API and saves translation to dictionary
+        # for text in xml_soup.find_all("w:t"):
+        #     translated = super().request_translation(text_input=text.string)
+        #     translation[text.string] = translated
+
+        # Text is surrounded by "w:t"
+        # After finding it is converted to strings
+        q = Queue()
+        texts_to_translate = xml_soup.find_all("w:t")
+        texts_to_translate = [text.string for text in texts_to_translate]
+
+        # Each worker is in fact a subscript for the list of text to translate
+        # Each thread iterates through given text in the list, sends it to API and saves translation to dictionary
+        def threader():
+            while True:
+                worker = q.get()
+                translated = self.request_translation(text_input=texts_to_translate[worker])
+                translation[texts_to_translate[worker]] = translated
+                q.task_done()
+
+        # Ten threads are spawned
+        for i in range(10):
+            t = Thread(target=threader)
+            t.daemon = True
+            t.start()
+
+        # Each possibile index for the list of text to translate is put in the queue
+        for text_pos in range(len(texts_to_translate)):
+            q.put(text_pos)
+
+        q.join()
 
         # The source slide is unpacked into simple string
         # Using dictionary that contains translations and sources, text will be replaced in the string
@@ -264,11 +312,39 @@ class TranslateWorkbook(TranslatePresentation):
         current_slide_data = archive.read(contents_file_rel_path)
         xml_soup = bs(current_slide_data.decode("UTF-8"), 'lxml')
 
-        # Text on each slide is surrounded by "w:t"
-        # Loop iterates through each mark in the xml file, sends it to API and saves translation to dictionary
-        for text in xml_soup.find_all("t"):
-            translated = super().request_translation(text_input=text.string)
-            translation[text.string] = translated
+        # Not threaded version:
+        # # Text on each slide is surrounded by "t"
+        # # Loop iterates through each mark in the xml file, sends it to API and saves translation to dictionary
+        # for text in xml_soup.find_all("t"):
+        #     translated = super().request_translation(text_input=text.string)
+        #     translation[text.string] = translated
+
+        # Text is surrounded by "t"
+        # After finding it is converted to strings
+        q = Queue()
+        texts_to_translate = xml_soup.find_all("t")
+        texts_to_translate = [text.string for text in texts_to_translate]
+
+        # Each worker is in fact a subscript for the list of text to translate
+        # Each thread iterates through given text in the list, sends it to API and saves translation to dictionary
+        def threader():
+            while True:
+                worker = q.get()
+                translated = self.request_translation(text_input=texts_to_translate[worker])
+                translation[texts_to_translate[worker]] = translated
+                q.task_done()
+
+        # Ten threads are spawned
+        for i in range(10):
+            t = Thread(target=threader)
+            t.daemon = True
+            t.start()
+
+        # Each possibile index for the list of text to translate is put in the queue
+        for text_pos in range(len(texts_to_translate)):
+            q.put(text_pos)
+
+        q.join()
 
         # The source slide is unpacked into simple string
         # Using dictionary that contains translations and sources, text will be replaced in the string
