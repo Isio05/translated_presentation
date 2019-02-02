@@ -4,7 +4,11 @@ from bs4 import BeautifulSoup as bs
 import json
 import zipfile
 from shutil import copyfile, rmtree
-from shared_variables import API_KEY
+import boto3
+import re
+import threading
+from queue import Queue
+from shared_variables import AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, API_KEY
 
 
 class TranslatePresentation:
@@ -15,6 +19,9 @@ class TranslatePresentation:
         self.user_num_of_slides = None
         self.file_to_translate = file_to_translate
         self.num_of_slides = 0
+        self.translate = boto3.client(service_name='translate', region_name='us-east-1', use_ssl=True,
+                                      aws_access_key_id=AWS_ACCESS_KEY_ID,
+                                      aws_secret_access_key=AWS_SECRET_ACCESS_KEY)
 
     def open_zip(self):
         """Opens file contained in zip file without extraction"""
@@ -64,15 +71,15 @@ class TranslatePresentation:
             # Loop iterates through each mark in the xml file, sends it to API and saves translation to dictionary
             for text in xml_soup.find_all("a:t"):
                 translated = self.request_translation(text_input=text.string)
-                translation[text.string] = translated['text'][0]
+                translation[text.string] = translated
 
             # The source slide is unpacked into simple string
             # Using dictionary that contains translations and sources, text will be replaced in the string
             # After the operation, string is encoded to basic format
             current_slide_data_decoded = current_slide_data.decode("UTF-8")
             for item, definition in translation.items():
-                current_slide_data_decoded = current_slide_data_decoded.replace("<a:t>" + item + "</a:t>",
-                                                                                "<a:t>" + definition + "</a:t>")
+                current_slide_data_decoded = current_slide_data_decoded.replace("<a:t>" + item,
+                                                                                "<a:t>" + definition)
             current_slide_data_encoded = current_slide_data_decoded.encode("UTF-8")
 
             # Using created temp folder, create there xml file containing translation
@@ -92,7 +99,7 @@ class TranslatePresentation:
         return translation
 
     @staticmethod
-    def request_translation(text_input):
+    def request_translation_yandex(text_input):
         url = "https://translate.yandex.net/api/v1.5/tr.json/translate"
         params = dict(key=API_KEY,
                       text=text_input.encode("UTF-8"),
@@ -101,7 +108,11 @@ class TranslatePresentation:
         response = requests.request(url=url, method=method, params=params)
         content = json.loads(response.content)
 
-        return content
+        return content['text'][0]
+
+    def request_translation(self, text_input):
+        result = self.translate.translate_text(Text=text_input, SourceLanguageCode="pl", TargetLanguageCode="en")
+        return result['TranslatedText']
 
     def convert_file_ext(self):
         """Changes the extension of file, from ppt(x) to zip and backwards"""
@@ -119,7 +130,7 @@ class TranslatePresentation:
             # Rename using original absolute path and that path with modified extension
             os.rename(archive_abs_path, archive_split[0] + self.old_extension)
         else:
-            print("Wrong extension of provided file.")
+            raise RuntimeError("Wrong extension of provided file.")
 
     def main(self):
         # Archive relative path - currently searches the catalog of script location
@@ -176,15 +187,26 @@ class TranslateDocument(TranslatePresentation):
         # Loop iterates through each mark in the xml file, sends it to API and saves translation to dictionary
         for text in xml_soup.find_all("w:t"):
             translated = super().request_translation(text_input=text.string)
-            translation[text.string] = translated['text'][0]
+            translation[text.string] = translated
+            # # To evade problems with replacing, space is trimmed from the string written to the dictionary
+            # if text.string[-1] == " ":
+            #     # To handle more than one space at the end of the string, re finds beginning of each 'space sequence'
+            #     # in the string and then the last one is chosen
+            #     found_spaces = [x.start() for x in re.finditer(" +", text.string)]
+            #     translation[text.string[:found_spaces[-1]]] = translated
+            # else:
+            #     translation[text.string] = translated
 
         # The source slide is unpacked into simple string
         # Using dictionary that contains translations and sources, text will be replaced in the string
         # After the operation, string is encoded to basic format
         current_slide_data_decoded = current_slide_data.decode("UTF-8")
         for item, definition in translation.items():
-            current_slide_data_decoded = current_slide_data_decoded.replace("<w:t>" + item + "</w:t>",
-                                                                            "<w:t>" + definition + "</w:t>")
+            current_slide_data_decoded = current_slide_data_decoded.replace("<w:t>" + item,
+                                                                            "<w:t>" + definition)
+            current_slide_data_decoded = current_slide_data_decoded.replace('<w:t xml:space="preserve">' + item,
+                                                                            '<w:t xml:space="preserve">' + definition)
+
         current_slide_data_encoded = current_slide_data_decoded.encode("UTF-8")
 
         # To write into archive, the source file must exist
@@ -246,15 +268,17 @@ class TranslateWorkbook(TranslatePresentation):
         # Loop iterates through each mark in the xml file, sends it to API and saves translation to dictionary
         for text in xml_soup.find_all("t"):
             translated = super().request_translation(text_input=text.string)
-            translation[text.string] = translated['text'][0]
+            translation[text.string] = translated
 
         # The source slide is unpacked into simple string
         # Using dictionary that contains translations and sources, text will be replaced in the string
         # After the operation, string is encoded to basic format
         current_slide_data_decoded = current_slide_data.decode("UTF-8")
         for item, definition in translation.items():
-            current_slide_data_decoded = current_slide_data_decoded.replace("<t>" + item + "</t>",
-                                                                            "<t>" + definition + "</t>")
+            current_slide_data_decoded = current_slide_data_decoded.replace('<t>' + item,
+                                                                            '<t>' + definition)
+            current_slide_data_decoded = current_slide_data_decoded.replace('<t xml:space="preserve">' + item,
+                                                                            '<t xml:space="preserve">' + definition)
         current_slide_data_encoded = current_slide_data_decoded.encode("UTF-8")
 
         # To write into archive, the source file must exist
