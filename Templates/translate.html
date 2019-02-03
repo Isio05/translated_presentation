@@ -1,0 +1,39 @@
+{% extends "layout.html" %}
+
+{% block head %}
+    Main page
+{% endblock %}
+
+
+{% block body %}
+    <form action="{{ url_for('translate', input_l='pl', output_l='en') }}" method="post" enctype="multipart/form-data">
+        <div class="form-row justify-content-center">
+            <div class="form-group col-4 pb-2" align="center">
+                <input type="file" class="form-control-file" id="upload-files" name="files" multiple autofocus>
+            </div>
+        </div>
+        <div class="form-row justify-content-center pb-3">
+            <div class="form-group px-2">
+                <label for="input_l">Choose input language</label>
+                <select class="form-control" id="input_l" name="input_l">
+                    {% for lang in language_pairs %}
+                    <option>{{ lang }}</option>
+                    {% endfor %}
+                    <option selected>{{input_l}}</option>
+                </select>
+            </div>
+            <div class="form-group px-2">
+                <label for="output_l">Choose output language</label>
+                <select class="form-control" id="output_l" name="output_l">
+                    {% for lang in language_pairs %}
+                    <option>{{ lang }}</option>
+                    {% endfor %}
+                    <option selected>{{output_l}}</option>
+                </select>
+            </div>
+        </div>
+        <div class="row justify-content-md-center pb-3">
+            <button type="submit" class="btn btn-primary">Translate</button>
+        </div>
+    </form>
+{% endblock %}
