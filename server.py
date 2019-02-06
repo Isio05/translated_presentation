@@ -4,6 +4,7 @@ from tempfile import mkdtemp
 from utils import LANGUAGE_PAIRS, CODE_PAIRS
 from shared_variables import SECRET_KEY
 from werkzeug.utils import secure_filename
+import zipfile
 import json
 import random
 import string
@@ -72,22 +73,34 @@ def translate(input_l, output_l):
             filename = secure_filename(file.filename)
             file.save(os.path.join(app.config["UPLOAD_FOLDER"], temp_folder, filename))
 
+        # Open archive where translated files will be saved
+        translated_files = zipfile.ZipFile(
+            os.path.join(app.config['UPLOAD_FOLDER'], temp_folder, "translated_files.zip"), "x")
+
         # Iterate through every file in the folder and translate it choosing appropriate class
         for f in [file for file in os.listdir(os.path.join(app.config["UPLOAD_FOLDER"], temp_folder))
-                  if os.path.isfile(os.path.join(app.config["UPLOAD_FOLDER"], temp_folder, file))]:
+                  if os.path.isfile(os.path.join(app.config["UPLOAD_FOLDER"], temp_folder, file)) and
+                  os.path.splitext(os.path.join(app.config["UPLOAD_FOLDER"], temp_folder, file))[1] != ".zip"]:
             file_type = os.path.splitext(f)[1]
             if file_type == ".docx":
                 translate = TranslateDocument(file_to_translate=f)
-                translate.main()
+                translated_file_coords = translate.main()
             elif file_type == ".pptx":
                 translate = TranslatePresentation(file_to_translate=f)
-                translate.main()
+                translated_file_coords = translate.main()
             elif file_type == ".xlsx":
                 translate = TranslateWorkbook(file_to_translate=f)
-                translate.main()
+                translated_file_coords = translate.main()
             else:
                 raise RuntimeError("Wrong file extension")
-            os.rmdir(os.path.join(app.config["UPLOAD_FOLDER"], temp_folder, f))
+            # Remove source file for translation
+            os.remove(os.path.join(app.config["UPLOAD_FOLDER"], temp_folder, f))
+            # Write translated file to archive
+            translated_files.write(translated_file_coords['translated_file_path'],
+                                   arcname=translated_file_coords['translated_file'])
+            # Remove translated file as it is contained within the archive
+            os.remove(
+                os.path.join(app.config["UPLOAD_FOLDER"], temp_folder, translated_file_coords['translated_file_path']))
 
         return redirect(url_for("translate", input_l=new_input_l, output_l=new_output_l))
     else:

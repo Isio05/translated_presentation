@@ -70,7 +70,7 @@ class TranslatePresentation:
             # The end of the loop is to write in archive_2 and start iteration on subsequent slide
             current_slide = slide_notation.replace("X", str(slide + 1))
             current_slide_data = archive.read("".join([slide_location, current_slide]))
-            xml_soup = bs(current_slide_data.decode("UTF-8"), 'lxml')
+            xml_soup = bs(current_slide_data.decode("UTF-8"), 'html.parser')
 
             # Not threaded version
             # Text on each slide is surrounded by "a:t"
@@ -163,6 +163,7 @@ class TranslatePresentation:
         elif archive_split[1] == ".zip":
             # Rename using original absolute path and that path with modified extension
             os.rename(archive_abs_path, archive_split[0] + self.old_extension)
+            return archive_split[0] + self.old_extension
         else:
             raise RuntimeError("Wrong extension of provided file.")
 
@@ -172,13 +173,19 @@ class TranslatePresentation:
         self.convert_file_ext()
         # Perform translation and print out the translated texts
         translated_pairs = self.open_zip()
-        [print(translated_pair) for translated_pair in translated_pairs.items()]
+        # [print(translated_pair) for translated_pair in translated_pairs.items()]
         # Change extensions of original and translated file back to ".ppt(x)"
+        # Original file conversion
         self.file_to_translate = self.file_ready_to_translate
         self.convert_file_ext()
+        # Translated file conversion
         self.file_to_translate = self.file_to_translate.replace(".zip", "_translated_copy.zip")
-        self.convert_file_ext()
-        print("Done")
+        translated_file_coords = dict()
+        translated_file_coords['translated_file_path'] = self.convert_file_ext()
+        translated_file_coords['translated_file'] = self.file_to_translate.replace(".zip", self.old_extension)
+        # print("Done")
+
+        return translated_file_coords
 
 
 class TranslateDocument(TranslatePresentation):
