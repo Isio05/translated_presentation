@@ -6,6 +6,7 @@ import zipfile
 from shutil import copyfile, rmtree
 import boto3
 import re
+from glob import glob
 from threading import Thread
 from queue import Queue
 from shared_variables import AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, API_KEY
@@ -18,6 +19,7 @@ class TranslatePresentation:
         self.file_to_translate = None
         self.user_num_of_slides = None
         self.file_to_translate = file_to_translate
+        self.file_to_translate = self.file_to_translate.replace("\\", "/")
         self.num_of_slides = 0
         self.translate = boto3.client(service_name='translate', region_name='us-east-1', use_ssl=True,
                                       aws_access_key_id=AWS_ACCESS_KEY_ID,
@@ -78,7 +80,7 @@ class TranslatePresentation:
             # After finding it is converted to strings
             q = Queue()
             texts_to_translate = xml_soup.find_all("a:t")
-            texts_to_translate = [text.string for text in texts_to_translate]
+            texts_to_translate = [text.string for text in texts_to_translate if text.string is not None]
 
             # Each worker is in fact a subscript for the list of text to translate
             # Each thread iterates through given text in the list, sends it to API and saves translation to dictionary
@@ -106,8 +108,9 @@ class TranslatePresentation:
             # After the operation, string is encoded to basic format
             current_slide_data_decoded = current_slide_data.decode("UTF-8")
             for item, definition in translation.items():
-                current_slide_data_decoded = current_slide_data_decoded.replace("<a:t>" + item,
-                                                                                "<a:t>" + definition)
+                if item is not None:
+                    current_slide_data_decoded = current_slide_data_decoded.replace("<a:t>" + item,
+                                                                                    "<a:t>" + definition)
             current_slide_data_encoded = current_slide_data_decoded.encode("UTF-8")
 
             # Using created temp folder, create there xml file containing translation
@@ -139,8 +142,11 @@ class TranslatePresentation:
         return content['text'][0]
 
     def request_translation(self, text_input):
-        result = self.translate.translate_text(Text=text_input, SourceLanguageCode="pl", TargetLanguageCode="en")
-        return result['TranslatedText']
+        if text_input is not None:
+            result = self.translate.translate_text(Text=text_input, SourceLanguageCode="fi", TargetLanguageCode="en")
+            return result['TranslatedText']
+        else:
+            return " "
 
     def convert_file_ext(self):
         """Changes the extension of file, from ppt(x) to zip and backwards"""
@@ -151,7 +157,8 @@ class TranslatePresentation:
         if archive_split[1] in (".pptx", ".docx", ".xlsx"):
             # Rename using original absolute path and that path with modified extension
             os.rename(archive_abs_path, archive_split[0] + ".zip")
-            self.file_ready_to_translate = str(archive_split[0].split("\\")[1]) + ".zip"
+            # self.file_ready_to_translate = str(archive_split[0].split("\\")[-1]) + ".zip"
+            self.file_ready_to_translate = str(archive_split[0].split("\\")[-1]) + ".zip"
             self.old_extension = archive_split[1]
             # Old extension is returned for usage in backwards conversion
         elif archive_split[1] == ".zip":
@@ -222,7 +229,7 @@ class TranslateDocument(TranslatePresentation):
         # After finding it is converted to strings
         q = Queue()
         texts_to_translate = xml_soup.find_all("w:t")
-        texts_to_translate = [text.string for text in texts_to_translate]
+        texts_to_translate = [text.string for text in texts_to_translate if text.string is not None]
 
         # Each worker is in fact a subscript for the list of text to translate
         # Each thread iterates through given text in the list, sends it to API and saves translation to dictionary
@@ -250,10 +257,11 @@ class TranslateDocument(TranslatePresentation):
         # After the operation, string is encoded to basic format
         current_slide_data_decoded = current_slide_data.decode("UTF-8")
         for item, definition in translation.items():
-            current_slide_data_decoded = current_slide_data_decoded.replace("<w:t>" + item,
-                                                                            "<w:t>" + definition)
-            current_slide_data_decoded = current_slide_data_decoded.replace('<w:t xml:space="preserve">' + item,
-                                                                            '<w:t xml:space="preserve">' + definition)
+            if item is not None:
+                current_slide_data_decoded = current_slide_data_decoded.replace("<w:t>" + item,
+                                                                                "<w:t>" + definition)
+                current_slide_data_decoded = current_slide_data_decoded.replace('<w:t xml:space="preserve">' + item,
+                                                                                '<w:t xml:space="preserve">' + definition)
 
         current_slide_data_encoded = current_slide_data_decoded.encode("UTF-8")
 
@@ -323,7 +331,7 @@ class TranslateWorkbook(TranslatePresentation):
         # After finding it is converted to strings
         q = Queue()
         texts_to_translate = xml_soup.find_all("t")
-        texts_to_translate = [text.string for text in texts_to_translate]
+        texts_to_translate = [text.string for text in texts_to_translate if text.string is not None]
 
         # Each worker is in fact a subscript for the list of text to translate
         # Each thread iterates through given text in the list, sends it to API and saves translation to dictionary
@@ -351,10 +359,11 @@ class TranslateWorkbook(TranslatePresentation):
         # After the operation, string is encoded to basic format
         current_slide_data_decoded = current_slide_data.decode("UTF-8")
         for item, definition in translation.items():
-            current_slide_data_decoded = current_slide_data_decoded.replace('<t>' + item,
-                                                                            '<t>' + definition)
-            current_slide_data_decoded = current_slide_data_decoded.replace('<t xml:space="preserve">' + item,
-                                                                            '<t xml:space="preserve">' + definition)
+            if item is not None:
+                current_slide_data_decoded = current_slide_data_decoded.replace('<t>' + item,
+                                                                                '<t>' + definition)
+                current_slide_data_decoded = current_slide_data_decoded.replace('<t xml:space="preserve">' + item,
+                                                                                '<t xml:space="preserve">' + definition)
         current_slide_data_encoded = current_slide_data_decoded.encode("UTF-8")
 
         # To write into archive, the source file must exist
@@ -378,7 +387,7 @@ class TranslateWorkbook(TranslatePresentation):
 
 def menu():
     while True:
-        file = input("Type in file type with extension or 'exit': ")
+        file = input("Type in file with extension or 'exit': ")
         if file == "exit":
             break
         file_type = os.path.splitext(file)[1]
@@ -395,4 +404,28 @@ def menu():
             print("Wrong file extension")
 
 
-menu()
+def translate_folder():
+    folder = input("Set folder located in the script folder: ")
+    extensions = ("docx", "pptx", "xlsx")
+
+    for extension in extensions:
+        # Glob requires absolute path to list files of given extension
+        files = glob(folder + "\\**\*.{}".format(extension), recursive=True)
+        # Program is prepared to work with folders/files located in the same directory as the script
+        files_rels = [folder.split("\\\\")[-1] + x.replace(folder, "") for x in files]
+        for file in files_rels:
+            file_type = os.path.splitext(file)[1]
+            if file_type == ".docx":
+                translate = TranslateDocument(file_to_translate=file)
+                translate.main()
+            elif file_type == ".pptx":
+                translate = TranslatePresentation(file_to_translate=file)
+                translate.main()
+            elif file_type == ".xlsx":
+                translate = TranslateWorkbook(file_to_translate=file)
+                translate.main()
+            os.remove(os.path.join(os.path.dirname(__file__), file))
+
+
+translate_folder()
+# menu()

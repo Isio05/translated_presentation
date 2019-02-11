@@ -19,6 +19,8 @@ def save_as_docx(path, word):
         # Save and Close
         doc.SaveAs(new_file_abs, FileFormat=constants.wdFormatXMLDocument)
         doc.Close()
+
+        os.remove(path)
     except:
         print("Incorrect file")
 
@@ -34,6 +36,8 @@ def save_as_xlsx(path, excel):
 
         wb.SaveAs(new_file_abs, FileFormat=constants.xlOpenXMLWorkbook	)
         wb.Close()
+
+        os.remove(path)
     except:
         print("Incorrect file")
 
@@ -50,6 +54,8 @@ def save_as_pptx(path, powerpoint):
 
         pres.SaveAs(new_file_abs, FileFormat=constants.ppSaveAsOpenXMLPresentation)
         pres.Close()
+
+        os.remove(path)
     except:
         print("Incorrect file")
 
