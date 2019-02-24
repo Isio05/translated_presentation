@@ -1,0 +1,26 @@
+{% extends "layout.html" %}
+
+{% block head %}
+    View translated files
+{% endblock %}
+
+{% block body %}
+    <table class="table">
+        <thead>
+            <tr>
+                <th>No. of translation</th>
+                <th>Date</th>
+                <th>Download</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for i in range(length) %}
+                <tr>
+                    <td>{{ t_names[i] }}</td>
+                    <td>{{ t_dates[i] }}</td>
+                    <td>Download</td>
+                </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+{% endblock %}

@@ -45,3 +45,5 @@ CODE_PAIRS = {
     "Swedish": "sv",
     "Turkish": "tr",
 }
+
+ALLOWED_EXTENSIONS = set(("pptx", "docx", "xlsx"))

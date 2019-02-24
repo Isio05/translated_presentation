@@ -92,7 +92,7 @@ class TranslatePresentation:
                     q.task_done()
 
             # Ten threads are spawned
-            for i in range(10):
+            for i in range(5):
                 t = Thread(target=threader)
                 t.daemon = True
                 t.start()
@@ -241,7 +241,7 @@ class TranslateDocument(TranslatePresentation):
                 q.task_done()
 
         # Ten threads are spawned
-        for i in range(10):
+        for i in range(5):
             t = Thread(target=threader)
             t.daemon = True
             t.start()
@@ -343,7 +343,7 @@ class TranslateWorkbook(TranslatePresentation):
                 q.task_done()
 
         # Ten threads are spawned
-        for i in range(10):
+        for i in range(5):
             t = Thread(target=threader)
             t.daemon = True
             t.start()
