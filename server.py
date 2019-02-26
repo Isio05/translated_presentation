@@ -1,5 +1,5 @@
 from open_it_aws import TranslatePresentation, TranslateWorkbook, TranslateDocument
-from flask import Flask, render_template, redirect, url_for, session, request, send_from_directory, make_response
+from flask import Flask, render_template, redirect, url_for, session, request, send_from_directory, make_response, send_file
 from tempfile import mkdtemp
 from utils import LANGUAGE_PAIRS, CODE_PAIRS, ALLOWED_EXTENSIONS
 from shared_variables import SECRET_KEY, AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY
@@ -164,7 +164,24 @@ def translated_files():
     return render_template("translated_files.html",
                            t_names=files_array[:, 0].tolist(),
                            t_dates=files_array[:, 2].tolist(),
-                           length = len(files_array[:, 0].tolist()))
+                           length=len(files_array[:, 0].tolist()))
+
+
+@app.route("/download")
+def download():
+    s3 = boto3.resource(service_name='s3', region_name='us-east-1', use_ssl=True,
+                        aws_access_key_id=AWS_ACCESS_KEY_ID,
+                        aws_secret_access_key=AWS_SECRET_ACCESS_KEY
+                        )
+
+    s3.Bucket("translatedfiles").download_file(
+        Key=str("anon_6uwQCFdArmpQ5myL" + "/" + "yudjF3B8gpsQLMLA" + "/" + "translated_files.zip"),
+        Filename=os.path.join(app.config["UPLOAD_FOLDER"], "download", "translated_files.zip"))
+
+    return send_file(os.path.join(app.config["UPLOAD_FOLDER"], "download", "translated_files.zip"),
+                     attachment_filename="translated_files.zip")
+
+    # return "File downloaded"
 
 
 app.run(port=4544, debug=True)
