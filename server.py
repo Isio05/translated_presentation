@@ -115,31 +115,34 @@ def translate(input_l, output_l):
                             )
 
         # Create random user name for not logged users - they will have their own folders on S3
+        anon_username_len = 16
+        anon_user_prefix = "anon_"
         try:
-            user_name = session['user']
+            session['user']
         except KeyError:
-            random_string = random.choices(string.ascii_letters + string.digits, k=16)
-            random_string.insert(0, "anon_")
-            user_name = ''.join(random_string)
-            session['user'] = user_name
+            if request.cookies.get("translated_files_list"):
+                session['user'] = request.cookies["translated_files_list"][0:len(anon_user_prefix) + anon_username_len]
+            else:
+                random_string = random.choices(string.ascii_letters + string.digits, k=anon_username_len)
+                session['user'] = ''.join((anon_user_prefix, "".join(random_string)))
 
         # Use resource to call Object object
         s3_object = s3.Object(bucket_name="translatedfiles",
-                              key=str(user_name + "/" + temp_folder + "/" + "translated_files.zip"))
+                              key=str(session['user'] + "/" + temp_folder + "/" + "translated_files.zip"))
         s3_object.upload_file(
             os.path.join(app.config['UPLOAD_FOLDER'], temp_folder, "translated_files.zip"))
 
         cookie = request.cookies.get("translated_files_list")
-        print(cookie)
 
-        # Cookies have following format: <temp_folder for translation_1>,<time of translation_1>,
+        # Cookies have following format: <temp_folder for translation_1 (with username)>,<time of translation_1>,
         # <temp_folder for translation_2>,<time of translation_2> etc.
         # The first parameter allows to retrieve files from S3, time is used for listing
         if not cookie:
             res = make_response(redirect(url_for("translate", input_l=new_input_l, output_l=new_output_l)))
-            res.set_cookie("translated_files_list", temp_folder + "," + str(datetime.now()), 60 * 60 * 24 * 30)
+            res.set_cookie("translated_files_list", session['user'] + '-' + temp_folder
+                           + "," + str(datetime.now()), 60 * 60 * 24 * 30)
         else:
-            cookie += "," + temp_folder + "," + str(datetime.now())
+            cookie += "," + session['user'] + '-' + temp_folder + "," + str(datetime.now())
             print(cookie)
             res = make_response(redirect(url_for("translate", input_l=new_input_l, output_l=new_output_l)))
             res.set_cookie("translated_files_list", cookie, 60 * 60 * 24 * 30)
@@ -163,25 +166,28 @@ def translated_files():
 
     return render_template("translated_files.html",
                            t_names=files_array[:, 0].tolist(),
+                           t_downloads = files_array[:, 1].tolist(),
                            t_dates=files_array[:, 2].tolist(),
                            length=len(files_array[:, 0].tolist()))
 
 
-@app.route("/download")
-def download():
+@app.route("/download/<chosen_file>")
+def download(chosen_file):
+    # Create connection to s3
     s3 = boto3.resource(service_name='s3', region_name='us-east-1', use_ssl=True,
                         aws_access_key_id=AWS_ACCESS_KEY_ID,
                         aws_secret_access_key=AWS_SECRET_ACCESS_KEY
                         )
 
+    # Select specific bucket and download the file chosen by the user
+    # Files are stored in the path user_name(contained in session data)/translation_name/translated_files.zip
     s3.Bucket("translatedfiles").download_file(
-        Key=str("anon_6uwQCFdArmpQ5myL" + "/" + "yudjF3B8gpsQLMLA" + "/" + "translated_files.zip"),
+        Key=str(chosen_file.replace("-", "/") + "/" + "translated_files.zip"),
         Filename=os.path.join(app.config["UPLOAD_FOLDER"], "download", "translated_files.zip"))
 
+    # Send saved file
     return send_file(os.path.join(app.config["UPLOAD_FOLDER"], "download", "translated_files.zip"),
                      attachment_filename="translated_files.zip")
-
-    # return "File downloaded"
 
 
 app.run(port=4544, debug=True)
