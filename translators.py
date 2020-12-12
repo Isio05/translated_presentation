@@ -10,6 +10,7 @@ from abc import ABC, abstractmethod
 import zipfile
 from bs4 import BeautifulSoup as bs
 from pptx import Presentation
+import pandas as pd
 import boto3
 # Import custom libs
 from shared_variables import AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY
@@ -211,14 +212,37 @@ class DocumentTranslator(Translator):
 class WorkbookTranslator(Translator):
     def __init__(self, file_to_translate: str = None):
         super().__init__(file_to_translate, False)
+        self.df = None
 
     def process_specific_file(self):
+        xl_file_source = pd.ExcelFile(path.join(SOURCE_FOLDER, self.file_to_translate))
+        xl_file_target = pd.ExcelWriter(path.join(TARGET_FOLDER, self.file_to_translate))
+        sheet_list = xl_file_source.sheet_names
+        for sheet_name in sheet_list:
+            self.df = pd.read_excel(xl_file_source, sheet_name, header=None, dtype='object',
+                                    na_values=[], keep_default_na=False,
+                                    true_values=[], false_values=[])
+            self.process_sheet()
+            self.df.to_excel(xl_file_target, sheet_name=sheet_name, header=False, index=False)
+
+        xl_file_target.save()
+
         return 0
+
+    def process_sheet(self):
+        # Extract text from df along with it's positions and translate
+        for col in range(len(self.df.columns)):
+            for row in range(len(self.df)):
+                extract = self.df.iloc[row, col]
+                print(extract)
+                translated_text = self.request_translation(extract)
+                print(translated_text)
+                self.df.iloc[row, col] = translated_text
 
 
 def menu():
     # Left for testing purposes
-    file = "lite.pptx" # input("Type in file type with extension or 'exit': ")
+    file = input("Type in file type with extension or 'exit': ") # "lite.xlsx"
 
     while True:
         if file == "exit":
@@ -240,14 +264,12 @@ def menu():
 
 
 def translate_folder():
-    folder = input("Set folder located in the script folder: ")
-
     for extension in ALLOWED_EXTENSIONS:
         # Glob requires absolute path to list files of given extension
-        files = glob(folder + "\\**\*.{}".format(extension), recursive=True)
+        files = glob(path.join(SOURCE_FOLDER, "**{}".format(extension)), recursive=True)
         # Program is prepared to work with folders/files located in the same directory as the script
-        files_rels = [folder.split("\\\\")[-1] + x.replace(folder, "") for x in files]
-        for file in files_rels:
+        for file in files:
+            file = path.split(file)[1]
             file_type = path.splitext(file)[1]
             if file_type == ".docx":
                 translate = DocumentTranslator(file_to_translate=file)
@@ -258,6 +280,7 @@ def translate_folder():
             elif file_type == ".xlsx":
                 translate = WorkbookTranslator(file_to_translate=file)
                 translate.process_specific_file()
-            os.remove(path.join(path.dirname(__file__), file))
+
 
 menu()
+# translate_folder()
