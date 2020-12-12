@@ -18,7 +18,11 @@
                 <tr>
                     <td>{{ t_names[i] }}</td>
                     <td>{{ t_dates[i] }}</td>
-                    <td><a href="/download/{{ t_downloads[i] }}">Download</a></td>
+                    {%if t_names[i] != "-" %}
+                        <td><a href="/download/{{ t_downloads[i] }}">Download</a></td>
+                    {% else %}
+                        {{ "-" }}
+                    {% endif %}
                 </tr>
             {% endfor %}
         </tbody>

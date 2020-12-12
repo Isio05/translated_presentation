@@ -46,4 +46,7 @@ CODE_PAIRS = {
     "Turkish": "tr",
 }
 
-ALLOWED_EXTENSIONS = set(("pptx", "docx", "xlsx"))
+ALLOWED_EXTENSIONS = {".pptx", ".docx", ".xlsx"}
+TEMP_FOLDER = "temp"
+SOURCE_FOLDER = "source"
+TARGET_FOLDER = "target"

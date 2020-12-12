@@ -1,17 +1,23 @@
-from open_it_aws import TranslatePresentation, TranslateWorkbook, TranslateDocument
-from flask import Flask, render_template, redirect, url_for, session, request, send_from_directory, make_response, send_file
-from tempfile import mkdtemp
-from utils import LANGUAGE_PAIRS, CODE_PAIRS, ALLOWED_EXTENSIONS
-from shared_variables import SECRET_KEY, AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY
-from werkzeug.utils import secure_filename
+# Import builtin libs
 from datetime import datetime
-import numpy as np
-import boto3
-import zipfile
 import json
 import random
 import string
 import os
+
+# Import third-party libs
+from flask import Flask, render_template, redirect, url_for, session, request, send_from_directory, make_response, send_file
+from werkzeug.utils import secure_filename
+from tempfile import mkdtemp
+import boto3
+import zipfile
+import numpy as np
+
+# Import custom libs
+from translators import PresentationTranslator, WorkbookTranslator, DocumentTranslator
+from utils import *
+from shared_variables import SECRET_KEY, AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY
+
 
 app = Flask(__name__, static_folder="Static", template_folder="Templates")
 # Configure session to use filesystem (instead of signed cookies)
@@ -46,8 +52,8 @@ def translate(input_l, output_l):
         # Using class methods change used language for each subsequent translation
         # Changes in languages will be inherited by other classes (Doc and Xls translation class inherit
         # translation method and its settings from the Presentation class)
-        TranslatePresentation.change_input_language(new_input_l=new_input_l)
-        TranslatePresentation.change_ouput_language(new_output_l=new_output_l)
+        PresentationTranslator.change_input_language(new_input_l=new_input_l)
+        PresentationTranslator.change_ouput_language(new_output_l=new_output_l)
 
         files = request.files.getlist('files')
 
@@ -61,7 +67,7 @@ def translate(input_l, output_l):
         # there is only need to change it in the super class
         temp_folder = ''.join(random.choices(string.ascii_letters + string.digits, k=16))
         os.mkdir(os.path.join(app.config["UPLOAD_FOLDER"], temp_folder))
-        TranslatePresentation.change_temp_folder(new_temp_folder=temp_folder)
+        PresentationTranslator.change_temp_folder(new_temp_folder=temp_folder)
 
         # Write files to the temporary folder
         for file in files:
@@ -83,13 +89,13 @@ def translate(input_l, output_l):
                      os.path.splitext(os.path.join(app.config["UPLOAD_FOLDER"], temp_folder, file))[1] != ".zip"]:
             file_type = os.path.splitext(f)[1]
             if file_type == ".docx":
-                translate = TranslateDocument(file_to_translate=f)
+                translate = DocumentTranslator(file_to_translate=f)
                 translated_file_coords = translate.main()
             elif file_type == ".pptx":
-                translate = TranslatePresentation(file_to_translate=f)
+                translate = PresentationTranslator(file_to_translate=f)
                 translated_file_coords = translate.main()
             elif file_type == ".xlsx":
-                translate = TranslateWorkbook(file_to_translate=f)
+                translate = WorkbookTranslator(file_to_translate=f)
                 translated_file_coords = translate.main()
             else:
                 raise RuntimeError("Wrong file extension")
@@ -158,15 +164,20 @@ def translate(input_l, output_l):
 @app.route("/translated-files")
 def translated_files():
     # Gather list of files and date from the cookie file
-    cookie = request.cookies.get("translated_files_list").split(",")
+    cookie = request.cookies.get("translated_files_list")
+    # If it's none then mark each column with a hyphen
+    if cookie is None:
+        files_array = np.array([["-", "-", "-"]])
     # Convert list to array that can be easily used
-    files_array = np.array(cookie, dtype=str)
-    files_array = files_array.reshape((-1,2))
-    files_array = np.hstack((np.arange(files_array.shape[0]).reshape((files_array.shape[0],1)), files_array))
+    else:
+        cookie = cookie.split(",")
+        files_array = np.array(cookie, dtype=str)
+        files_array = files_array.reshape((-1,2))
+        files_array = np.hstack((np.arange(files_array.shape[0]).reshape((files_array.shape[0],1)), files_array))
 
     return render_template("translated_files.html",
                            t_names=files_array[:, 0].tolist(),
-                           t_downloads = files_array[:, 1].tolist(),
+                           t_downloads=files_array[:, 1].tolist(),
                            t_dates=files_array[:, 2].tolist(),
                            length=len(files_array[:, 0].tolist()))
 

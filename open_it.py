@@ -143,7 +143,7 @@ class TranslatePresentation:
 
     def request_translation(self, text_input):
         if text_input is not None:
-            result = self.translate.translate_text(Text=text_input, SourceLanguageCode="fi", TargetLanguageCode="en")
+            result = self.translate.translate_text(Text=text_input, SourceLanguageCode="en", TargetLanguageCode="pl")
             return result['TranslatedText']
         else:
             return " "
